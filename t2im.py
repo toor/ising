@@ -2,6 +2,7 @@
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+import matplotlib.colors
 # used for runtime stats
 import time
 from numba import jit
@@ -74,9 +75,10 @@ def calculate_total_spin(lattice):
 
 # Run metropolis on a specific lattice for a given temperature
 def metropolis(lattice, iterations, T):
-    energies = np.zeros((1, iterations))
-    spins = np.zeros((1, iterations))
-    # it = []
+    (x, y) = lattice.shape
+    n = x*y
+    energies = np.zeros((iterations,))
+    spins = np.zeros((iterations,))
     
     # Choose an interaction energy that is of the same order as the thermal energy kT ~10^-21 for
     # T between 0 and 1000K
@@ -91,13 +93,15 @@ def metropolis(lattice, iterations, T):
         j = np.random.randint(y)
         
         old = lattice[i][j]
-        E_i = calculate_total_energy(lattice, J) # energy before spin flip
+        E_i_total = calculate_total_energy(lattice, J)
+        E_i = np.divide(E_i_total, n)
         initial_spin = calculate_total_spin(lattice)
         
         # update to the new state and calculate the new energy and total spin
         new = -1*old
         lattice[i][j] = new
-        E_f = calculate_total_energy(lattice, J) # energy after spin flip
+        E_f_total = calculate_total_energy(lattice, J)
+        E_f = np.divide(E_f_total, n)
         final_spin = calculate_total_spin(lattice)
         
         # determine the change in energy
@@ -110,33 +114,37 @@ def metropolis(lattice, iterations, T):
         # determine whether to accept the new state
         if E_f < E_i:
             t += 1
-            spins.append(final_spin)
-            energies.append(E_f)
+            np.append(spins, final_spin)
+            np.append(energies, E_f/n)
             # it.append(t)
             continue
         elif P < bz:
             t += 1
-            spins.append(initial_spin)
-            energies.append(E_f)
+            np.append(spins, final_spin)
+            np.append(energies, E_f)
             # it.append(t)
             continue
         else:
             # revert to the old state and move on
             t += 1
             lattice[i][j] = old
-            spins.append(initial_spin)
-            energies.append(E_i)
+            np.append(spins, initial_spin)
+            np.append(energies, E_i)
             # it.append(t)
             continue
-    energies = np.array(energies)
-    spins = np.array(energies)
-    
+    # Compute energy and magnetisation for this temperature
+    energy = np.divide(np.sum(energies), iterations)
+    spin = np.divide(np.sum(spins), iterations)
+
     # return the final state
     # energy = np.divide(np.sum(energies), len(energies))
     # spin = np.divide(np.sum(spins), len(spins))
     return lattice, energy, spin
 
+# Make a plot of the spins
 def plot(lattice, i):
+    cmap = colors.ListedColormap(['red', 'blue'])
+
     plt.figure(i)
     plt.imshow(lattice)
     plt.colorbar()
@@ -146,20 +154,7 @@ def plot(lattice, i):
     plt.close()
     return
 
-# Take a thermodynamic average of a particular quantity
-# Q: Quantity of interest
-# Z: Partition function
-# energies: The energy levels of the system
-# @jit(nopython=True)
-def thermodynamic_average(Q, Z, energies, T):
-    if Q.size != energies.size:
-        print("Error: Number of samples of Q does not match the number of energy samples (levels)")
-        return None
-    num = np.sum(np.multiply(Q, np.exp(np.divide(-energies, (k_B*T)))))
-    avg = num / Z
-    return avg
-
-N = 50
+N = 20
 iterations = 20000
 
 # Run for NxN lattice for temperatures between 0 and 300K in 10K intervals
@@ -167,14 +162,15 @@ temperatures = np.arange(50, 310, 5)
 
 tick = time.time()
 
-energies = []
-spins = []
+energies = np.zeros((temperatures.size,))
+spins = np.zeros((temperatures.size,))
+
 for i in range(0, temperatures.size):
     T = str(temperatures[i]) + "K"
     print("Temperature = " + T)
     lattice, energy, spin = metropolis(initial_state(N,N), iterations, temperatures[i])
-    energies.append(energy)
-    spins.append(spin)
+    np.append(energies, energy)
+    np.append(spins, spin)
     plot(lattice, i)
 
 energies = np.array(energies)
