@@ -10,6 +10,11 @@ from numba import jit
 # Boltzmann's constant
 k_B = 1.38*np.power(10.0, -23)
 
+# Adjustable parameters that govern the scale of the simulation
+N = 20
+iterations = 20000
+
+
 @jit(nopython=True)
 def initial_state(x, y):
     # 75% negative
@@ -71,7 +76,10 @@ def calculate_total_spin(lattice):
             _spin = lattice[i][j]
             spin += _spin
     return spin
+
 @jit(nopython=True)
+# Returns the total average energy per spin, average spin,
+# average energy squared and average spin squared
 def energy_and_spin(lattice, n):
     E_total = calculate_total_energy(lattice)
     E_2_total = np.power(E_total, 2)
@@ -81,7 +89,7 @@ def energy_and_spin(lattice, n):
     S_total = calculate_total_spin(lattice)
     S_2_total = np.power(S_total, 2)
     S = np.divide(S_total, n)
-    S_2 = np.divide(S_2_total, n)   
+    S_2 = np.divide(S_2_total, n) 
 
     return E, E_2, S, S_2, E_total
 
@@ -176,8 +184,6 @@ def plot(lattice, i, T):
     plt.close()
     return
 
-N = 20
-iterations = 20000
 
 # Run for NxN lattice for temperatures between 0 and 300K in 10K intervals
 temperatures = np.arange(1, 310, 1)   
