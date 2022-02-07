@@ -20,6 +20,20 @@ def magnetisation_T(x, T_c, gamma, A):
     # Theoretically, T_c is ~164K.
     return A*np.power((T_c - x), gamma)
 
+# Make a plot of the spins
+def plot(lattice, T):
+    cmap = colors.ListedColormap(['red', 'blue'])
+
+    plt.figure()
+    plt.imshow(lattice, cmap)
+
+    # save the file by temperature identifier
+    name = "fig_" + str(T) + "K" + ".png"
+    plt.xlabel("T = " + str(T))
+    plt.savefig(name)
+    plt.close()
+    return
+
 def make_plots(data):
     temperatures = data[0]
     energies = data[1]
@@ -78,14 +92,25 @@ def ising():
     heat_caps = np.zeros((temperatures.size,))
     susceptibilities = np.zeros((temperatures.size,))
 
+    special_temps = np.array([50, 100, 150, 200, 250, 300])
+
     for i in range(0, temperatures.size):
-        print("Temperature = " + str(temperatures[i]) + "K")
+        T = temperatures[i]
+
+        print("Temperature = " + str(T) + "K")
+        
         print("Running Metropolis algorithm to allow system to equilibrate for " + str(I_eq) + " iterations.")
         # First solve for the equilibrium state. For a 20x20 lattice, 2500 iterations are sufficient
         # remove ^
-        eq_state = metropolis(initial_state(n,n), I_eq, temperatures[i])[0]
+        eq_state = metropolis(initial_state(n,n), I_eq, T)[0]
+        
         print("Now calculating thermodynamic properties over " + str(I_s) + " iterations.")
-        lattice, data = metropolis(eq_state, I_s, temperatures[i])
+        lattice, data = metropolis(eq_state, I_s, T)
+        
+        if np.isin(T, special_temps)[0]:
+            print("Plotting lattice for T = " + str(T) + "K")
+            plot(lattice, i, T)
+
         energies[i] = data[0]
         spins[i] = data[1]
         heat_caps[i] = data[2]
