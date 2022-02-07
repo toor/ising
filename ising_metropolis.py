@@ -54,11 +54,12 @@ def initial_state(x, y):
     return lattice
 
 
+# i: 0 -> x - 1
+# j: 0 -> y - 1
 @jit(nopython=True)
 def nearest_neighbours(lattice, i, j):
     (x,y) = lattice.shape
-    x -= 1
-    y -= 1
+
     nn = [lattice[(i - 1)%x][j], lattice[(i+1)%x][j], lattice[i][(j-1)%y], lattice[i][(j + 1)%y]]
 
     nn = np.array(nn)
