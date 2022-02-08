@@ -2,9 +2,11 @@ import numpy as np
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from ising_metropolis import metropolis, initial_state
+import matplotlib.colors as clr
+
 
 T_i = 1
-T_f = 300
+T_f = 301
 step = 1
 
 # I_eq: iterations required to reach the equilibrium state
@@ -22,7 +24,7 @@ def magnetisation_T(x, T_c, gamma, A):
 
 # Make a plot of the spins
 def plot(lattice, T):
-    cmap = colors.ListedColormap(['red', 'blue'])
+    cmap = clr.ListedColormap(['red', 'blue'])
 
     plt.figure()
     plt.imshow(lattice, cmap)
@@ -60,7 +62,7 @@ def make_plots(data):
 
     plt.figure()
     plt.scatter(temperatures, spins, c="red", marker='x')
-    plt.plot(temperatures, _mag, c="blue")
+    #plt.plot(temperatures, _mag, c="blue")
     plt.xlabel("Temperature (K)")
     plt.ylabel("Magnetisation")
     plt.savefig("magnetisation_vs_temperature.png")
@@ -107,9 +109,9 @@ def ising():
         print("Now calculating thermodynamic properties over " + str(I_s) + " iterations.")
         lattice, data = metropolis(eq_state, I_s, T)
         
-        if np.isin(T, special_temps)[0]:
+        if np.isin(T, special_temps):
             print("Plotting lattice for T = " + str(T) + "K")
-            plot(lattice, i, T)
+            plot(eq_state, T)
 
         energies[i] = data[0]
         spins[i] = data[1]
