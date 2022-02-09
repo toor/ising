@@ -6,14 +6,14 @@ import matplotlib.colors as clr
 
 
 T_i = 1
-T_f = 301
+T_f = 305
 step = 1
 
 # I_eq: iterations required to reach the equilibrium state
 I_eq = 2500
 # I_s: iterations over which the thermodynamic properties
 # are calculated.
-I_s = 20000
+I_s = 10000
 # dimension of lattice. In this case we are using a square lattice,
 # though this code accounts for rectangular lattices also.
 n = 20
@@ -42,44 +42,51 @@ def make_plots(data):
     spins = data[2]
     heat_caps = data[3]
     susceptibilities = data[4]
-
-    # Fit a curve to the magnetisation. We expect the magnetisation to go
-    # like M ~ (T_c - T)^{\gamma} where \gamma is a parameter to fit - see
-    # magnetisation_T.
-    print("plots: attempting to fit a curve to magnetisation data")
-    popt,pcov = curve_fit(magnetisation_T, temperatures, spins, bounds=([295, 0, 0.1], [305, 1, 1]))
-
-    print(popt)
-    _mag = np.zeros((temperatures.size,))
-    for j in range(0, temperatures.size):
-        _mag[j] = magnetisation_T(temperatures[j], popt[0], popt[1], popt[2])
-        
+       
     plt.figure()
-    plt.scatter(temperatures, energies, c="red", marker='x')
+    plt.plot(temperatures, energies, c="red")
     plt.xlabel("Temperature (K)")
     plt.ylabel("Average energy E/J")
     plt.savefig("energy_vs_temperature.png")
 
     plt.figure()
-    plt.scatter(temperatures, spins, c="red", marker='x')
-    #plt.plot(temperatures, _mag, c="blue")
+    plt.plot(temperatures, spins, c="red")
     plt.xlabel("Temperature (K)")
     plt.ylabel("Magnetisation")
     plt.savefig("magnetisation_vs_temperature.png")
 
     plt.figure()
-    plt.scatter(temperatures, heat_caps, c="red", marker='x')
+    plt.plot(temperatures, heat_caps, c="red")
     plt.xlabel("Temperature (K)")
     plt.ylabel("Heat capacity C_V (JK^-1)")
     plt.savefig("heat_capacity_vs_temperature.png")
 
     plt.figure()
-    plt.scatter(temperatures, susceptibilities, c="red", marker='x')
+    plt.plot(temperatures, susceptibilities, c="red")
     plt.xlabel("Temperature (K)")
     plt.ylabel("Susceptibility")
     plt.savefig("susceptibility_vs_temperature.png")
     
     return
+
+# spin_gradient: Determines the slope between each pair of points
+# in the spin vs. temperature distribution.
+# Parameters: temperatures - array of temperatures (ndarray.int64)
+#             spins - array of spins (ndarray.float64)
+# Returns: slopes - array of slopes (ndarray.float64)
+def spin_gradient(temperatures, spins):
+    spins_i = spins[0:(temperatures.size - 1)]
+    spins_f = np.roll(spins, -1)[0:(temperatures.size - 1)]
+    temps_i = temperatures[0:(temperatures.size - 1)]
+    temps_f = np.roll(temperatures, - 1)[0:(temperatures.size - 1)]
+
+    delta_S = np.subtract(spins_f, spins_i)
+    delta_T = np.subtract(temps_f, temps_i)
+
+    slopes = np.divide(delta_S, delta_T)
+
+    return slopes
+
 
 # TODO: Make initial, final temperatures, iterations and lattice size CLI parameters
 # note however that the number of iterations required for "thermalisation" - the period
@@ -117,6 +124,31 @@ def ising():
         spins[i] = data[1]
         heat_caps[i] = data[2]
         susceptibilities[i] = data[3]
+    
+    # make an array that will contain tuples of the slopes,
+    # together with the temperatures they correspond to. First define a new datatype that will
+    # allow us to sort the resulting array
+    _type = [('slope', float), ('T_i', float), ('T_f', float)]
+
+    # Iterate pairwise over temperatures and spins and determine the slope.
+    # TODO: Is there a way to do this without explicity iterating over
+    # `temperatures`? e.g. create another array of temperatures, offset by 1,
+    # and could then use np.subtract to subtract elements pairwise and then could simply
+    # read off the slopes from an array
+    # example: temperatures = [0,1,2,3,4]
+    #       => temperatures' = [1,2,3,4, None] since we want to neglect the last element
+    slopes = spin_gradient(temperatures, spins)
+    # This is a bit ugly, but I don't really know how to zip up these arrays
+    # correctly
+    values = np.array([(slopes[i],
+        temperatures[i],
+        temperatures[i + 1]) for i in range(0, temperatures.size - 1)], dtype=_type)
+
+    # This is pretty slow - the complexity of numpy's sort can be as bad
+    # as O(n*log(n)). Anyway, this sorts `values` - recall these elements are tuples - according
+    # to the slope
+    np.sort(values, order='slope')
+    print(values)
 
     data = np.array([temperatures, energies, spins, heat_caps, susceptibilities]) 
     make_plots(data)
