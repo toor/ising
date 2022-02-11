@@ -1,26 +1,22 @@
 import numpy as np
-from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
-from ising_metropolis import metropolis, initial_state
+from metro import metropolis, initial_state
 import matplotlib.colors as clr
 
+# Begin adjustable parameters
 
 T_i = 1
 T_f = 305
 step = 1
 
 # I_eq: iterations required to reach the equilibrium state
-I_eq = 2500
+I_eq = 3000
 # I_s: iterations over which the thermodynamic properties
 # are calculated.
-I_s = 10000
+I_s = 15000
 # dimension of lattice. In this case we are using a square lattice,
 # though this code accounts for rectangular lattices also.
 n = 20
-
-def magnetisation_T(x, T_c, gamma, A):
-    # Theoretically, T_c is ~164K.
-    return A*np.power((T_c - x), gamma)
 
 # Make a plot of the spins
 def plot(lattice, T):
@@ -42,11 +38,11 @@ def make_plots(data):
     spins = data[2]
     heat_caps = data[3]
     susceptibilities = data[4]
-       
+    
     plt.figure()
     plt.plot(temperatures, energies, c="red")
     plt.xlabel("Temperature (K)")
-    plt.ylabel("Average energy E/J")
+    plt.ylabel("Average energy (J)")
     plt.savefig("energy_vs_temperature.png")
 
     plt.figure()
@@ -58,7 +54,7 @@ def make_plots(data):
     plt.figure()
     plt.plot(temperatures, heat_caps, c="red")
     plt.xlabel("Temperature (K)")
-    plt.ylabel("Heat capacity C_V (JK^-1)")
+    plt.ylabel("Heat capacity (JK^-1)")
     plt.savefig("heat_capacity_vs_temperature.png")
 
     plt.figure()
@@ -69,89 +65,46 @@ def make_plots(data):
     
     return
 
-# spin_gradient: Determines the slope between each pair of points
-# in the spin vs. temperature distribution.
-# Parameters: temperatures - array of temperatures (ndarray.int64)
-#             spins - array of spins (ndarray.float64)
-# Returns: slopes - array of slopes (ndarray.float64)
-def spin_gradient(temperatures, spins):
-    spins_i = spins[0:(temperatures.size - 1)]
-    spins_f = np.roll(spins, -1)[0:(temperatures.size - 1)]
-    temps_i = temperatures[0:(temperatures.size - 1)]
-    temps_f = np.roll(temperatures, - 1)[0:(temperatures.size - 1)]
-
-    delta_S = np.subtract(spins_f, spins_i)
-    delta_T = np.subtract(temps_f, temps_i)
-
-    slopes = np.divide(delta_S, delta_T)
-
-    return slopes
-
-
-# TODO: Make initial, final temperatures, iterations and lattice size CLI parameters
-# note however that the number of iterations required for "thermalisation" - the period
-# over which the system approaches thermal equilibrium - will depend on the dimensions
-# of the lattice in question.
 def ising():
-    temperatures = np.arange(T_i, T_f, step)
-
+    print("ising: Implements 2D Ising model. To play around with the parameters used in this model, see `ising.py`.")
     # Prepare data
+    temperatures = np.arange(T_i, T_f, step)
     energies = np.zeros((temperatures.size,))
     spins = np.zeros((temperatures.size,))
     heat_caps = np.zeros((temperatures.size,))
     susceptibilities = np.zeros((temperatures.size,))
-
-    special_temps = np.array([50, 100, 150, 200, 250, 300])
-
+    
+    print("ising: Beginning calculation of thermodynamic properties.")
     for i in range(0, temperatures.size):
         T = temperatures[i]
 
-        print("Temperature = " + str(T) + "K")
+        print("Temperature = " + str(T) + "K.")
         
-        print("Running Metropolis algorithm to allow system to equilibrate for " + str(I_eq) + " iterations.")
-        # First solve for the equilibrium state. For a 20x20 lattice, 2500 iterations are sufficient
-        # remove ^
+        # First solve for the equilibrium state. 
         eq_state = metropolis(initial_state(n,n), I_eq, T)[0]
-        
-        print("Now calculating thermodynamic properties over " + str(I_s) + " iterations.")
-        lattice, data = metropolis(eq_state, I_s, T)
-        
-        if np.isin(T, special_temps):
-            print("Plotting lattice for T = " + str(T) + "K")
-            plot(eq_state, T)
+        # Now calculate statistics 
+        data = metropolis(eq_state, I_s, T)[1]
 
         energies[i] = data[0]
         spins[i] = data[1]
         heat_caps[i] = data[2]
         susceptibilities[i] = data[3]
     
-    # make an array that will contain tuples of the slopes,
-    # together with the temperatures they correspond to. First define a new datatype that will
-    # allow us to sort the resulting array
-    _type = [('slope', float), ('T_i', float), ('T_f', float)]
-
-    # Iterate pairwise over temperatures and spins and determine the slope.
-    # TODO: Is there a way to do this without explicity iterating over
-    # `temperatures`? e.g. create another array of temperatures, offset by 1,
-    # and could then use np.subtract to subtract elements pairwise and then could simply
-    # read off the slopes from an array
-    # example: temperatures = [0,1,2,3,4]
-    #       => temperatures' = [1,2,3,4, None] since we want to neglect the last element
-    slopes = spin_gradient(temperatures, spins)
-    # This is a bit ugly, but I don't really know how to zip up these arrays
-    # correctly
-    values = np.array([(slopes[i],
-        temperatures[i],
-        temperatures[i + 1]) for i in range(0, temperatures.size - 1)], dtype=_type)
-
-    # This is pretty slow - the complexity of numpy's sort can be as bad
-    # as O(n*log(n)). Anyway, this sorts `values` - recall these elements are tuples - according
-    # to the slope
-    np.sort(values, order='slope')
-    print(values)
+    spins_i = spins[0:(temperatures.size - 1)]
+    spins_f = np.roll(spins, -1)[0:(temperatures.size - 1)]   
+    sz = spins_i.size
+    s_max = np.amax(spins)
+    s_min = np.min(spins)
+    
+    print("ising: Attempting to determine the critical temperature.")
+    for j in range(0, sz - 1):
+        slope1 = spins_f[j] - spins_i[j]
+        slope2 = spins_f[j + 1] - spins_i[j + 1]
+        if (slope2 - slope1) < 0 and np.abs((slope2 - slope1)) >= 3*(s_max - s_min)/4:
+            T_c = temperatures[j]
+            print("ising: The critical temperature is ~ " + str(T_c) + "K.")
 
     data = np.array([temperatures, energies, spins, heat_caps, susceptibilities]) 
     make_plots(data)
-
 
 ising()
