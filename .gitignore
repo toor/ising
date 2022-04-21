@@ -1,4 +1,6 @@
 *.png
+*.dat
+*.tar.gz
 
 **/__pycache__/
 /figs/
